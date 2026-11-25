@@ -17,10 +17,13 @@ class GameScreen(private val app: App, private val game: Game) : Container() {
     private val controller = PlayerController(game)
     private val hvs = game.field.hexViewSize
 
+    /** Drawn tile radius: a hair over the field's hex size so neighbouring tiles leave no seams. */
+    private val tileR = 1.02 * game.field.hexSize
+    private val spriteBox = 1.55 * game.field.hexSize
+
     // --- layers
     private val background = image(assets.background)
     private val world = container()
-    private val shadowLayer = world.container()
     private val hexLayer = world.container()
     private val overlayLayer = world.container()
     private val borderLayer = world.container()
@@ -87,17 +90,12 @@ class GameScreen(private val app: App, private val game: Game) : Container() {
     private fun toWorldY(y: Float) = -y.toDouble()
 
     private fun buildStaticField() {
-        // land shadows and hexes are created once; only textures change afterwards
+        // hexes are created once, back to front so each side band is covered by the tile below; only textures change afterwards
         val sorted = game.field.activeHexes.sortedByDescending { it.y }
         for (hex in sorted) {
-            shadowLayer.image(assets.shadowHex) {
-                size(Size(2 * hvs, 2 * hvs))
-                xy(hex.x - hvs + 0.1 * hvs, toWorldY(hex.y) - 0.85 * hvs)
-                alpha = 0.6
-            }
             hexImages[hex] = hexLayer.image(assets.hexFor(hex.fraction)) {
-                size(Size(2 * 0.99 * hvs, 2 * 0.99 * hvs))
-                xy(hex.x - 0.99 * hvs, toWorldY(hex.y) - 0.99 * hvs)
+                size(Size(2 * tileR, 2 * tileR * assets.hexAspect))
+                xy(hex.x - tileR, toWorldY(hex.y) - HALF_SQRT3 * tileR)
             }
         }
     }
@@ -117,7 +115,7 @@ class GameScreen(private val app: App, private val game: Game) : Container() {
             for (dir in 0 until 3) { // each pair once
                 val adj = hex.adjacent(dir)
                 if (!adj.active || adj.fraction == hex.fraction) continue
-                drawEdge(hex, adj, half, thickness, Colors.BLACK.withAd(0.55))
+                drawEdge(hex, adj, half, thickness, Colors.BLACK.withAd(0.3))
             }
         }
     }
@@ -138,9 +136,9 @@ class GameScreen(private val app: App, private val game: Game) : Container() {
     }
 
     private fun objectBitmap(hex: Hex) = when (hex.objectInside) {
-        Obj.TOWN -> assets.castle
+        Obj.TOWN -> assets.castleFor(hex.fraction)
         Obj.TOWER -> assets.tower
-        Obj.STRONG_TOWER -> assets.strongTower
+        Obj.STRONG_TOWER -> assets.strongTowerFor(hex.fraction)
         Obj.FARM -> assets.farms[hex.visualDiversityIndex]
         Obj.PINE -> assets.pine
         Obj.PALM -> assets.palm
@@ -154,14 +152,14 @@ class GameScreen(private val app: App, private val game: Game) : Container() {
         for (hex in withObjects) {
             val bmp = objectBitmap(hex) ?: continue
             objectLayer.image(bmp) {
-                size(Size(1.4 * hvs, 1.6 * hvs))
-                xy(hex.x - 0.7 * hvs, toWorldY(hex.y) - 1.1 * hvs)
+                size(Size(spriteBox, spriteBox))
+                xy(hex.x - spriteBox / 2, toWorldY(hex.y) - SPRITE_FOOT * spriteBox)
             }
         }
     }
 
     private inner class UnitView(val unit: GameUnit) {
-        val image = unitLayer.image(assets.units[unit.strength - 1]) { size(Size(1.4 * hvs, 1.6 * hvs)) }
+        val image = unitLayer.image(assets.units[unit.strength - 1]) { size(Size(spriteBox, spriteBox)) }
         var seenMoves = unit.moveCounter
         var animStart = -10.0
         var strength = unit.strength
@@ -186,7 +184,7 @@ class GameScreen(private val app: App, private val game: Game) : Container() {
                 val p = (timeSec % JUMP_PERIOD) / JUMP_PERIOD
                 jump = 4 * 0.11 * p * (1 - p) * hvs
             }
-            image.xy(x - 0.7 * hvs, -y - 1.1 * hvs - jump)
+            image.xy(x - spriteBox / 2, -y - SPRITE_FOOT * spriteBox - jump)
         }
     }
 
@@ -217,8 +215,8 @@ class GameScreen(private val app: App, private val game: Game) : Container() {
 
     private fun hexOverlay(hex: Hex, color: RGBA, alpha: Double) {
         overlayLayer.image(assets.whiteHex) {
-            size(Size(2 * 0.99 * hvs, 2 * 0.99 * hvs))
-            xy(hex.x - 0.99 * hvs, toWorldY(hex.y) - 0.99 * hvs)
+            size(Size(2 * tileR, 2 * HALF_SQRT3 * tileR))
+            xy(hex.x - tileR, toWorldY(hex.y) - HALF_SQRT3 * tileR)
             colorMul = color
             this.alpha = alpha
         }
@@ -247,7 +245,7 @@ class GameScreen(private val app: App, private val game: Game) : Container() {
         val h = screenH
         hud.solidRect(w, topBarH, RGBA(0, 0, 0, 0x90))
         turnChip = hud.image(assets.hexFor(0)) {
-            size(Size(topBarH * 0.7, topBarH * 0.7))
+            size(Size(topBarH * 0.7, topBarH * 0.7 * assets.hexAspect))
             xy(topBarH * 0.2, topBarH * 0.15)
         }
         turnText = hud.text("", 24 * ui, Colors.WHITE, font, TextAlignment.MIDDLE_LEFT) { xy(topBarH * 1.05, topBarH / 2) }
@@ -297,7 +295,7 @@ class GameScreen(private val app: App, private val game: Game) : Container() {
         for (a in actions) {
             val icon = when (a) {
                 BuildAction.TOWER -> assets.tower
-                BuildAction.STRONG_TOWER -> assets.strongTower
+                BuildAction.STRONG_TOWER -> assets.strongTowerFor(game.turn)
                 BuildAction.FARM -> assets.farms[0]
                 else -> assets.units[a.unitStrength - 1]
             }
@@ -502,7 +500,7 @@ class GameScreen(private val app: App, private val game: Game) : Container() {
         val c = Container()
         c.solidRect(screenW, screenH, RGBA(0, 0, 0, 0xA0))
         c.image(assets.hexFor(game.turn)) {
-            size(Size(140 * ui, 140 * ui))
+            size(Size(140 * ui, 140 * ui * assets.hexAspect))
             xy(screenW / 2 - 70 * ui, screenH * 0.35)
         }
         c.text("${Str.PLAYER_TURN} ${game.turn + 1}", 40 * ui, Colors.WHITE, font, TextAlignment.MIDDLE_CENTER) {
@@ -531,7 +529,7 @@ class GameScreen(private val app: App, private val game: Game) : Container() {
         c.text(title, 64 * ui, Colors.WHITE, font, TextAlignment.MIDDLE_CENTER) { xy(screenW / 2, screenH * 0.33) }
         if (winner >= 0) {
             c.image(assets.hexFor(winner)) {
-                size(Size(120 * ui, 120 * ui))
+                size(Size(120 * ui, 120 * ui * assets.hexAspect))
                 xy(screenW / 2 - 60 * ui, screenH * 0.33 + 60 * ui)
             }
         }
@@ -554,5 +552,9 @@ class GameScreen(private val app: App, private val game: Game) : Container() {
         const val MOVE_TIME = 0.22
         const val JUMP_PERIOD = 0.5
         const val AI_DELAY = 0.12
+        val HALF_SQRT3 = kotlin.math.sqrt(3.0) / 2
+
+        /** Fraction of the sprite box above a hex centre (sprites stand at 80% of their 100x100 viewBox). */
+        const val SPRITE_FOOT = 0.8
     }
 }

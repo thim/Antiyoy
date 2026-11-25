@@ -7,17 +7,16 @@ import korlibs.io.async.*
 import korlibs.io.file.std.*
 import kotlin.coroutines.*
 
-/** Textures, font and sounds taken from the original Antiyoy assets. */
+/** Textures ("Ilhas de brinquedo" art, see art/export.py), plus font and sounds from the original Antiyoy. */
 class Assets private constructor(
     val hexByColor: List<BmpSlice>,
     val whiteHex: BmpSlice,
     val colorRgba: List<RGBA>,
-    val shadowHex: BmpSlice,
     val background: BmpSlice,
     val units: List<BmpSlice>,
-    val castle: BmpSlice,
+    private val castles: List<BmpSlice>,
     val tower: BmpSlice,
-    val strongTower: BmpSlice,
+    private val strongTowers: List<BmpSlice>,
     val farms: List<BmpSlice>,
     val pine: BmpSlice,
     val palm: BmpSlice,
@@ -29,6 +28,13 @@ class Assets private constructor(
 ) {
     /** Hex texture for a fraction. Color index == fraction (neutral 7 is gray), as in the original with no color offset. */
     fun hexFor(fraction: Int): BmpSlice = hexByColor[fraction.coerceIn(0, hexByColor.size - 1)]
+
+    fun castleFor(fraction: Int): BmpSlice = castles[fraction.coerceIn(0, castles.size - 1)]
+
+    fun strongTowerFor(fraction: Int): BmpSlice = strongTowers[fraction.coerceIn(0, strongTowers.size - 1)]
+
+    /** Height / width of a hex tile image (top face plus side band). */
+    val hexAspect: Double get() = hexByColor[0].height.toDouble() / hexByColor[0].width
 
     fun colorFor(fraction: Int): RGBA = colorRgba[fraction.coerceIn(0, colorRgba.size - 1)]
 
@@ -45,15 +51,14 @@ class Assets private constructor(
     }
 
     companion object {
-        private val HEX_NAMES = listOf(
-            "green", "red", "blue", "cyan", "yellow", "color1", "color2", "color3", "color4", "color5", "color6",
-        )
+        /** Fraction indices 0..10 (7 is neutral), as exported by art/export.py. */
+        private const val COLORS = 11
 
         suspend fun load(): Assets {
             val res = resourcesVfs
             suspend fun bmp(name: String): Bitmap = res[name].readBitmap()
-            val hexBitmaps = HEX_NAMES.map { bmp("hex_$it.png") }
-            val colors = hexBitmaps.map { it.getRgbaRaw(it.width / 2, it.height / 2) }
+            val hexBitmaps = (0 until COLORS).map { bmp("tiles/hex_$it.png") }
+            val colors = hexBitmaps.map { it.getRgbaRaw(it.width / 2, it.height / 3) }
             val font: Font = try {
                 res["font.otf"].readTtfFont()
             } catch (_: Throwable) {
@@ -68,19 +73,13 @@ class Assets private constructor(
             }
             return Assets(
                 hexByColor = hexBitmaps.map { it.slice() },
-                whiteHex = hexBitmaps[0].toBMP32().clone().apply {
-                    for (y in 0 until height) for (x in 0 until width) {
-                        val a = getRgbaRaw(x, y).a
-                        setRgbaRaw(x, y, RGBA(255, 255, 255, a))
-                    }
-                }.slice(),
+                whiteHex = bmp("tiles/hex_top_white.png").slice(),
                 colorRgba = colors,
-                shadowHex = bmp("shadow_hex.png").slice(),
                 background = bmp("game_background_water.png").slice(),
                 units = (0..3).map { bmp("fe/man$it.png").slice() },
-                castle = bmp("fe/castle.png").slice(),
+                castles = (0 until COLORS).map { bmp("fe/castle_$it.png").slice() },
                 tower = bmp("fe/tower.png").slice(),
-                strongTower = bmp("fe/strong_tower.png").slice(),
+                strongTowers = (0 until COLORS).map { bmp("fe/strong_tower_$it.png").slice() },
                 farms = (1..3).map { bmp("fe/farm$it.png").slice() },
                 pine = bmp("fe/pine.png").slice(),
                 palm = bmp("fe/palm.png").slice(),

@@ -9,7 +9,8 @@ com renderização em [KorGE](https://korge.org) e saída para web (JS e WebAsse
 | --- | --- |
 | `core/` | Lógica pura em `commonMain`: campo hexagonal, províncias, economia, unidades, combate, turnos, gerador de mapas, IA (fácil, normal, difícil, especialista, balanceador), desfazer. Sem dependência de renderização. |
 | `src/` | App KorGE: menu, tela do jogo, câmera (arrastar/zoom/pinça), HUD, sons. |
-| `resources/` | Sprites, fonte e sons do jogo original (PNGs re-codificados: os originais têm um chunk EXIF inválido). |
+| `art/` | Arte "Ilhas de brinquedo" em SVG gerado por código (`sprites.py`) e o exportador para PNG (`export.py`, usa `rsvg-convert`). |
+| `resources/` | PNGs exportados de `art/` (hexágonos com borda, sprites 256 px, castelo e torre forte em cada cor de reino), mais fonte, sons e o ícone de fim de turno do jogo original. |
 | `web/` | `index.html` copiado para o build Wasm (o KorGE não gera um). |
 
 Mapeamento das classes originais:
@@ -23,6 +24,11 @@ Mapeamento das classes originais:
 | `SelectionManager` | `PlayerController` |
 | `SnapshotManager` | `Snapshot` |
 | `ai/*GenericRules`, `AiEasy` | `ai/AiLevels.kt` |
+
+## Arte
+
+Para mudar a arte, edite `art/sprites.py` e rode `python3 art/export.py`; os PNGs em `resources/` são regenerados.
+A proposta visual completa (paleta, regras de luz, antes e depois) está no canvas de design do projeto.
 
 ## Comandos
 

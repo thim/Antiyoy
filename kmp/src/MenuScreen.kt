@@ -26,7 +26,7 @@ class MenuScreen(private val app: App) : Container() {
         val stripW = colorsShown * hexSize * 0.9
         for (i in 0 until colorsShown) {
             image(assets.hexFor(i)) {
-                size(Size(hexSize, hexSize))
+                size(Size(hexSize, hexSize * assets.hexAspect))
                 xy((w - stripW) / 2 + i * hexSize * 0.9, h * 0.05)
             }
         }
